@@ -60,7 +60,7 @@ import java.util.Queue;
  * </pre>
  *
  * <h3>Sending a stream which generates a chunk intermittently</h3>
- *
+ * <p>
  * Some {@link ChunkedInput} generates a chunk on a certain event or timing.
  * Such {@link ChunkedInput} implementation often returns {@code null} on
  * {@link ChunkedInput#readChunk(ChannelHandlerContext)}, resulting in the indefinitely suspended
@@ -161,11 +161,11 @@ public class ChunkedWriteHandler extends ChannelDuplexHandler {
         ctx.fireChannelWritabilityChanged();
     }
 
-    private void discard(Throwable cause) {
+    private boolean discard(Throwable cause) {
         if (queueIsEmpty()) {
-            return;
+            return false;
         }
-        for (;;) {
+        for (; ; ) {
             PendingWrite currentWrite = queue.poll();
 
             if (currentWrite == null) {
@@ -202,12 +202,15 @@ public class ChunkedWriteHandler extends ChannelDuplexHandler {
                 currentWrite.fail(cause);
             }
         }
+        return true;
     }
 
     private void doFlush(final ChannelHandlerContext ctx) {
         final Channel channel = ctx.channel();
         if (!channel.isActive()) {
-            discard(null);
+            if (!discard(null)) {
+                ctx.flush();
+            }
             return;
         }
 
